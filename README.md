@@ -1,7 +1,7 @@
 # SnailType
 
 <p align="center">
-  **A little slower. A little better.**
+  <strong>A little slower. A little better.</strong>
 </p>
 
 <p align="center">
@@ -32,7 +32,7 @@ Designed around a distraction-free interface, it combines real-time typing feedb
 
 ## Tech Stack
 
-- Next.js
+- Next.js (App Router)
 - React
 - TypeScript
 - Tailwind CSS
@@ -42,10 +42,12 @@ Designed around a distraction-free interface, it combines real-time typing feedb
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 20 or later
 - npm
 
 ### Installation
+
+Clone the repository and install the dependencies:
 
 ```bash
 git clone https://github.com/Devrohitanand/snailtype.git
