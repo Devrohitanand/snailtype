@@ -42,8 +42,7 @@ body {
   overscroll-behavior: none;
 }
 
-/* Dotted ambient background — the design calls for an almost-black canvas with
- * faint pinpoint texture to break up the dark plane without changing its color. */
+/* faint dots on the dark background */
 body::before {
   content: "";
   position: fixed;
@@ -70,7 +69,7 @@ textarea {
   font-family: inherit;
 }
 
-/* Caret vertical bar — flat 2px bar, no anti-aliased soft edges. */
+/* the pink caret */
 .caret {
   width: 2px;
   height: 34px;
@@ -82,15 +81,14 @@ textarea {
   pointer-events: none;
   transition: opacity 120ms ease;
   will-change: transform;
-  /* Hidden until TypingTest positions it for the first time (data-ready). */
+  /* stays hidden until TypingTest places it, so it never flashes in the corner */
   visibility: hidden;
 }
 .caret[data-ready="true"] {
   visibility: visible;
 }
 
-/* Caret blink during idle / preview. Active typing uses the smooth translate
- * only and disables blinking. */
+/* blinks only in idle/preview, not while typing */
 .caret--idle {
   animation: caretBlink 1.06s steps(2, end) infinite;
 }
@@ -105,7 +103,7 @@ textarea {
   }
 }
 
-/* Typing stream word wrap and line breaks. */
+/* keeps long words and line breaks wrapping inside the card */
 .words-flow {
   white-space: pre-wrap;
   word-break: break-word;
