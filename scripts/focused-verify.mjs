@@ -1,8 +1,3 @@
-// scripts/focused-verify.mjs
-// Tight, deterministic Playwright verification of the four reported bugs.
-// Read the *first character of the typed-spliced preview phrase* from the
-// live DOM, then type that char through page.keyboard.press so the
-// character text matches exactly what the React state validates against.
 import { chromium } from "playwright-core";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
@@ -27,8 +22,7 @@ async function fresh(viewport, name) {
   return { ctx, page };
 }
 
-// Concatenate the two preview spans (typed + untyped), trim leading whitespace
-// and whitespace-only phrases, return the first visible letter.
+// Concatenate the two preview spans (typed + untyped)
 async function firstDisplayChar(page) {
   return page.evaluate(() => {
     const spans = Array.from(document.querySelectorAll("main span"));
@@ -46,7 +40,7 @@ async function readErr(page) {
   });
 }
 
-// ---------- 1. Preview → first character ----------
+// 1. Preview -> first character 
 {
   const { ctx, page } = await fresh({ width: 1440, height: 900 }, "firstchar");
   await page.waitForTimeout(1200);

@@ -1,8 +1,3 @@
-// scripts/compare.mjs
-// Quick pixel-level comparison of two PNGs. Reports dims, mean color diff,
-// and renders a thumbnail diff grid for the human reviewer.
-// Usage: node scripts/compare.mjs <reference.png> <candidate.png> [out.png]
-
 import { readFileSync, writeFileSync } from "node:fs";
 import { PNG } from "pngjs";
 

@@ -14,6 +14,7 @@ function bindPage(page, name) {
     if (msg.type() === "error") errors.push(`${name} console: ${msg.text()}`);
   });
 }
+
 async function readPreviewChar(page) {
   return page.evaluate(() => {
     const candidates = Array.from(document.querySelectorAll("main span"));
@@ -26,7 +27,7 @@ async function readPreviewChar(page) {
       return c.color.includes("92, 78, 86") || s.className?.includes?.("opacity-50");
     });
     if (!typedSpan || !untypedSpan) return null;
-    // First character of the untyped portion (skip leading space).
+    // next char the preview is going to type
     return (untypedSpan.textContent || "").charAt(0);
   });
 }
@@ -36,12 +37,11 @@ async function newPage(width, height, name) {
   const page = await ctx.newPage();
   bindPage(page, name);
   await page.goto("http://127.0.0.1:3000/", { waitUntil: "networkidle" });
-  await page.waitForTimeout(1500); // let preview advance past its first start
+  await page.waitForTimeout(1500); // give the preview a moment to start
   return { ctx, page };
 }
 
-// Snapshot the next preview letter at the moment we are about to type so
-// a rotated phrase is matched correctly.
+// read the char right before typing, the phrase can rotate on us
 async function typeFirstPreviewChar(page) {
   const first = await readPreviewChar(page);
   if (!first) throw new Error("could not read preview char from DOM");
@@ -49,7 +49,6 @@ async function typeFirstPreviewChar(page) {
   return first;
 }
 
-// Read live err metric from the stats strip.
 async function readErr(page) {
   return page.evaluate(() => {
     const labels = Array.from(document.querySelectorAll("main span"));
@@ -64,17 +63,15 @@ function check(name, ok, detail = "") {
   console.log(`${ok ? "PASS" : "FAIL"} ${name}${detail ? " — " + detail : ""}`);
 }
 
-//       1. Baseline / layout screenshots 
+// layout checks (desktop)
 const desktop = await newPage(1440, 900, "desktop");
 const footer = desktop.page.locator("footer");
 const stage = desktop.page.locator("[ref], div.relative.z-10").first();
 
-// Footer bottom-anchored: footer bottom should be near viewport bottom
 const footerBox = await footer.boundingBox();
 const footerBottomGap = 900 - (footerBox ? footerBox.y + footerBox.height : 0);
 check("footer anchored to bottom of viewport", footerBottomGap <= 2, `gap=${footerBottomGap}px`);
 
-// Footer center element mathematically centered relative to container
 const footerCenter = desktop.page.locator("footer > div > div:nth-child(2)");
 const fBox = await footer.boundingBox();
 const cBox = await footerCenter.boundingBox();
@@ -85,11 +82,10 @@ if (fBox && cBox) {
   check("restart shortcut centered in container", false, "bounding boxes unavailable");
 }
 
-// Instagram appears exactly once in footer, right-aligned
 const igCount = await desktop.page.locator('footer a[href*="instagram"]').count();
 check("instagram link appears exactly once", igCount === 1, `count=${igCount}`);
 
-// Typing-test group vertical centering: measure gap above telemetry bar vs below sub-canvas strip
+// space above the stats bar vs space below the stage should be about equal
 const group = desktop.page.locator("main > div.relative.z-10");
 const groupBox = await group.boundingBox();
 const navBox = await desktop.page.locator("header").boundingBox();
@@ -104,19 +100,18 @@ if (groupBox && navBox && footerBox) {
 
 await desktop.page.screenshot({ path: path.join(outDir, "desktop.png") });
 
-//      2. Preview → first character 
-// 2a. correct first char accepted without error
+// first character from preview
 {
   const { ctx, page } = await newPage(1440, 900, "firstchar");
-  await page.waitForTimeout(200); // let preview start typing
+  await page.waitForTimeout(200);
   const first = await typeFirstPreviewChar(page);
   await page.waitForTimeout(300);
   const errMetric = await readErr(page);
   check("correct first char accepted without error", errMetric === "0", `firstChar=${first} err=${errMetric}`);
-  // caret should be near the first line of text, not panel bottom
+
   const caretBox = await page.locator(".caret").boundingBox();
   const flowBox = await page.locator("div[style*='font-size']").first().boundingBox();
-  // Inspect caret alignment on the untyped preview/initial state.
+
   await page.waitForTimeout(200);
   const idleCaret = await page.locator(".caret").boundingBox();
   const idleFlow = await page.locator("div[style*='font-size']").first().boundingBox();
@@ -128,8 +123,9 @@ await desktop.page.screenshot({ path: path.join(outDir, "desktop.png") });
     const dy = Math.abs(caretBox.y - flowBox.y);
     check("caret follows text after first char", dy <= 80, `caretY=${caretBox.y.toFixed(0)} flowY=${flowBox.y.toFixed(0)} dy=${dy.toFixed(0)}`);
   }
-  // wrong first char
-  await page.keyboard.press("Escape"); // restart
+
+  // now a wrong first char after restart
+  await page.keyboard.press("Escape");
   await page.waitForTimeout(400);
   await page.keyboard.type("~");
   await page.waitForTimeout(300);
@@ -138,10 +134,10 @@ await desktop.page.screenshot({ path: path.join(outDir, "desktop.png") });
   await ctx.close();
 }
 
-// 2b. typing after long preview wait (rotation may have advanced)
+// preview has rotated a few phrases by the time we type
 {
   const { ctx, page } = await newPage(1440, 900, "longwait");
-  await page.waitForTimeout(7000); // let preview loop several phrases
+  await page.waitForTimeout(7000);
   const first = await typeFirstPreviewChar(page);
   await page.waitForTimeout(300);
   const errMetric = await readErr(page);
@@ -149,12 +145,12 @@ await desktop.page.screenshot({ path: path.join(outDir, "desktop.png") });
   await ctx.close();
 }
 
-// 2c. one keystroke -> one input update (exits preview + one extra char)
+// each keystroke should only count once
 {
   const { ctx, page } = await newPage(1440, 900, "onekey");
   await page.waitForTimeout(200);
-  const first = await readPreviewChar(page); // exits preview + types this char
-  const second = (await readPreviewChar(page)) ?? ""; // 2nd visible char
+  const first = await readPreviewChar(page);
+  const second = (await readPreviewChar(page)) ?? "";
   await page.waitForTimeout(300);
   const idx = await page.evaluate(() => {
     const spans = document.querySelectorAll("[data-token-index]");
@@ -181,7 +177,7 @@ await desktop.page.screenshot({ path: path.join(outDir, "desktop.png") });
   await ctx.close();
 }
 
-// 2d. backspace moves caret backward / restart resets
+// backspace, then restart
 {
   const { ctx, page } = await newPage(1440, 900, "backspace");
   await page.waitForTimeout(200);
@@ -201,7 +197,7 @@ await desktop.page.screenshot({ path: path.join(outDir, "desktop.png") });
     return count;
   });
   check("backspace restores previous token", processed === 1, `first=${first} second=${second} processed=${processed}`);
-  // restart via tab+enter
+
   await page.keyboard.press("Tab");
   await page.waitForTimeout(200);
   await page.keyboard.press("Enter");
@@ -211,7 +207,7 @@ await desktop.page.screenshot({ path: path.join(outDir, "desktop.png") });
   await ctx.close();
 }
 
-// 2e. mode switch before test start
+// switch to words mode before starting
 {
   const { ctx, page } = await newPage(1440, 900, "modeswitch");
   await page.getByRole("tab", { name: "words" }).click();
@@ -225,9 +221,8 @@ await desktop.page.screenshot({ path: path.join(outDir, "desktop.png") });
   await ctx.close();
 }
 
-//         3. Mobile screenshot 
+// mobile
 const mobile = await newPage(375, 812, "mobile");
-// No overlap: footer top must be below group bottom
 const mGroupBox = await mobile.page.locator("main > div.relative.z-10").boundingBox();
 const mFooterBox = await mobile.page.locator("footer").boundingBox();
 if (mGroupBox && mFooterBox) {
