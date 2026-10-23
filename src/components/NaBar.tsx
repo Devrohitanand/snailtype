@@ -69,7 +69,7 @@ export default function NaBar({
   const [confirmReset, setConfirmReset] = useState(false);
   const panelId = useId();
 
-  // Whenever the profile panel opens, take a fresh snapshot of stored stats.
+  // reload stats every time the profile panel opens
   useEffect(() => {
     if (open === "profile") {
       setSnapshot(loadStats().results);
@@ -77,8 +77,7 @@ export default function NaBar({
     }
   }, [open]);
 
-  // Close on Escape and outside click. The setting/profile open states are
-  // mutually exclusive, so closing one also releases focus from the other.
+  // close on Escape or click outside
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -86,7 +85,7 @@ export default function NaBar({
         e.preventDefault();
         setOpen(null);
         setConfirmReset(false);
-        // Return focus to the trigger that opened it.
+        // give focus back to the button
         (open === "settings" ? triggerSettingsRef.current : triggerProfileRef.current)?.focus();
       }
     }
@@ -385,8 +384,7 @@ function loadPreferencesOrCurrent(
   sound: boolean,
   preview: boolean,
 ): Preferences {
-  // Read whatever is currently in storage and only override the keys we just
-  // changed, so unrelated settings preserved on disk survive a partial write.
+  // start from what's saved, only change these four
   const stored = loadPreferences();
   return {
     ...stored,
