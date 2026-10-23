@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="snailtype_website.png" alt="SnailType typing test interface" width="100%" />
+  <img src="./snailtype_website.png" alt="SnailType typing test interface" width="100%" />
 </p>
 
 ---
