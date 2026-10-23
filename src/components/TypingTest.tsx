@@ -60,7 +60,7 @@ const TEXT_SIZE_LINE_HEIGHT: Record<Preferences["textSize"], number> = {
   lg: 52,
 };
 
-// Must match `.caret { height }` in globals.css.
+// keep in sync with the .caret height in globals.css
 const CARET_HEIGHT_PX = 34;
 
 export default function TypingTest() {
@@ -68,7 +68,7 @@ export default function TypingTest() {
   const [stats, setStats] = useState<StoredStats>({ results: [] });
   const [statsLoaded, setStatsLoaded] = useState(false);
 
-  // Hydrate preferences and stats from localStorage on mount only.
+  // load saved prefs and stats once on mount
   useEffect(() => {
     setPrefs(loadPreferences());
     const stored = loadStats();
@@ -122,8 +122,7 @@ export default function TypingTest() {
   const previewActiveRef = useRef(true);
   const reduceMotionRef = useRef(false);
 
-  // Always-prev refs let the keydown handler use the freshest values without
-  // re-binding the listener on every state change.
+  // latest state for the key handler, so it doesn't re-bind on every change
   const stateRef = useRef({
     isPreview: true,
     testStarted: false,
@@ -172,14 +171,12 @@ export default function TypingTest() {
     tokens,
   ]);
 
-  // Sync the preview phrase index ref so the keydown handler can read the
-  // exact phrase the user just saw without waiting for a re-render.
+  // keep the phrase index in a ref so the key handler sees what's on screen
   useEffect(() => {
     previewPhraseIndexRef.current = previewPhraseIndex;
   }, [previewPhraseIndex]);
 
-  // Detect prefers-reduced-motion at runtime so the preview typewriter and
-  // caret blink can be disabled accordingly.
+  // check reduced motion so the typewriter and blink can be turned off
   useEffect(() => {
     if (typeof window === "undefined") return;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -195,7 +192,7 @@ export default function TypingTest() {
     };
   }, []);
 
-  /** Build a fresh interactive passage for the given mode. */
+  /** pick a new passage for the current mode */
   const choosePassage = useCallback(
     (previousPassage: string | null): string => {
       const candidate = pickPassage(previousPassage);
@@ -207,11 +204,9 @@ export default function TypingTest() {
     [mode, wordsLimit],
   );
 
-  /** Position the caret over the glyph that is actually rendered on screen.
-   * Active typing measures the current token span; preview measures the first
-   * rendered character of the preview phrase. Both use the same glyph box, so
-   * the caret is vertically centred on the text in either mode and does not
-   * jump when preview hands over to the typing passage. */
+  /** Place the caret on the glyph that's actually rendered. Preview uses
+   * the first character, typing uses the current token, so the caret
+   * doesn't jump when preview turns into the real test. */
   const updateCaretPosition = useCallback((liveIndex?: number) => {
     const caret = caretRef.current;
     const stage = stageCardRef.current;
@@ -220,13 +215,13 @@ export default function TypingTest() {
 
     let glyph: DOMRect | null = null;
     if (flow.querySelector("[data-token-index]")) {
-      // Active passage.
+      // typing mode
       const idx = liveIndex ?? stateRef.current.currentIndex;
       const target = flow.querySelector<HTMLElement>(`[data-token-index="${idx}"]`);
       if (!target) return; // past the last token: keep the last position
       glyph = target.getBoundingClientRect();
     } else {
-      // Preview phrase: measure the first rendered character.
+      // preview mode: use the first rendered character
       const walker = document.createTreeWalker(flow, NodeFilter.SHOW_TEXT);
       let node = walker.nextNode();
       while (node && !node.textContent) node = walker.nextNode();
@@ -238,8 +233,7 @@ export default function TypingTest() {
     }
     if (glyph.width === 0 && glyph.height === 0) return; // not laid out yet
 
-    // The caret is absolutely positioned inside the stage's padding box, so the
-    // origin is inside the stage's border (clientLeft/clientTop).
+    // the caret sits inside the card's border, so measure from there
     const stageRect = stage.getBoundingClientRect();
     const originX = stageRect.left + stage.clientLeft;
     const originY = stageRect.top + stage.clientTop;
@@ -247,20 +241,16 @@ export default function TypingTest() {
     const x = glyph.left - originX;
     const y = glyph.top - originY + (glyph.height - CARET_HEIGHT_PX) / 2;
 
-    // Snap to device pixels so the 2px bar stays crisp and never sits on a
-    // half pixel.
+    // round to device pixels so the bar stays sharp
     const dpr = window.devicePixelRatio || 1;
     const sx = Math.round(x * dpr) / dpr;
     const sy = Math.round(y * dpr) / dpr;
     caret.style.transform = `translate3d(${sx}px, ${sy}px, 0)`;
-    // Reveal the caret only after its first real measurement. Until then it
-    // stays hidden (see `.caret` in globals.css) so the server-rendered caret
-    // never flashes in the stage's top-left corner before hydration.
+    // stay hidden until the first measurement so it doesn't flash in the corner on load
     caret.dataset.ready = "true";
   }, []);
 
-  /** Update the live metrics strip without causing hit-test rescans on each
-   * keystroke. We batch into a single React state. */
+  /** refresh the stats strip in one state update */
   const refreshLiveMetrics = useCallback(
     (overrides?: Partial<{ currentIndex: number; correctCount: number; errorCount: number; timerRemaining: number; startMs: number | null; testStarted: boolean }>) => {
       const ref = stateRef.current;
@@ -302,7 +292,7 @@ export default function TypingTest() {
     [mode, timeLimit, wordsLimit],
   );
 
-  /** Hard stop of any running interval or preview timeout. */
+  /** stop the timer and the preview timeouts */
   const clearTimers = useCallback(() => {
     if (timerIdRef.current !== null) {
       window.clearInterval(timerIdRef.current);
@@ -314,8 +304,7 @@ export default function TypingTest() {
     }
   }, []);
 
-  /** Set up a brand-new test with the same or new passage. Called when the
-   * user restarts, changes mode, or requests a new passage. */
+  /** reset everything for a new test (restart, mode change or new passage) */
   const setupNewTest = useCallback(
     (passageOverride?: string) => {
       clearTimers();
@@ -351,7 +340,7 @@ export default function TypingTest() {
     [clearTimers, choosePassage, passage, refreshLiveMetrics, timeLimit],
   );
 
-  /** Persist a completed test into localStorage and update React state. */
+  /** save a finished test to localStorage and state */
   const persistResult = useCallback(
     (wpm: number, accuracy: number, correct: number, errors: number, durationMs: number) => {
       const target = stateRef.current.mode === "time" ? stateRef.current.timeLimit : stateRef.current.wordsLimit;
@@ -374,8 +363,7 @@ export default function TypingTest() {
     [],
   );
 
-  /** End-of-test cleanup: clear intervals, stop the timer, compute metrics,
-   * record the result, render results overlay. */
+  /** wrap up the test: stop timers, work out the result and save it */
   const finishTest = useCallback(() => {
     if (stateRef.current.testFinished) return;
     clearTimers();
@@ -408,12 +396,10 @@ export default function TypingTest() {
     );
   }, [clearTimers, persistResult]);
 
-  // Late-binding reference so timer callbacks (defined inside beginLiveTest)
-  // always invoke the latest closure of finishTest while allowing TypeScript
-  // to keep forward declarations working.
+  // ref so the timer always calls the latest finishTest
   finishTestRef.current = finishTest;
 
-  /** Once the test formally begins, run the timer. */
+  /** start the timer on the first keystroke */
   const beginLiveTest = useCallback(() => {
     if (stateRef.current.testStarted) return;
     const start = Date.now();
@@ -452,12 +438,10 @@ export default function TypingTest() {
     }
   }, [refreshLiveMetrics]);
 
-  // Typewriter preview animation effect. Handles its own timeouts so it can
-  // be cancelled cleanly when the user begins typing.
+  // typewriter animation for the preview phrase
   useEffect(() => {
     if (!prefs.preview || reduceMotionRef.current) {
-      // Skip the preview but render the first phrase statically so the panel
-      // looks like the supplied design without animation.
+      // preview off or reduced motion: show the first phrase without animating
       if (!stateRef.current.passage) {
         const first = PREVIEW_PHRASES[0]!;
         setPreviewCharIndex(first.length);
@@ -500,16 +484,12 @@ export default function TypingTest() {
     };
   }, [previewPhraseIndex, prefs.preview]);
 
-  // Keyboard handler at the window level — captures user keys when they are
-  // focused on the test card. The hidden input is reserved as a fallback
-  // composition target for IMEs.
+  // window keydown listener, the hidden input is only for IME / mobile keyboards
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const ref = stateRef.current;
 
-      // Preview mode: any printable / space / backspace presses exit preview
-      // and starts a fresh test using the passage the user just saw, so the
-      // first keystroke validates against characters they can actually see.
+      // any key leaves preview and starts a test with the phrase on screen
       if (ref.isPreview) {
         if (
           ["Control", "Alt", "Shift", "Meta", "Tab", "Escape", "CapsLock"].includes(e.key)
@@ -518,8 +498,7 @@ export default function TypingTest() {
         e.preventDefault();
         const displayedPhrase = PREVIEW_PHRASES[previewPhraseIndexRef.current] ?? PREVIEW_PHRASES[0]!;
         exitPreviewAndArm(displayedPhrase);
-        // Forward the same key into the freshly armed test to avoid the
-        // awkward "press once to start, press again to register first char".
+        // pass the same key to the new test so the first press counts
         if (shouldConsumeKey(e)) {
           if (e.key === "Backspace") handleBackspace();
           else handleCharacterInput(e.key === " " ? " " : e.key);
@@ -527,7 +506,7 @@ export default function TypingTest() {
         return;
       }
 
-      // Results panel: Enter retries same passage, Esc picks new one.
+      // results screen: Enter retries, Esc gives a new passage
       if (ref.testFinished) {
         if (e.key === "Enter") {
           e.preventDefault();
@@ -542,7 +521,7 @@ export default function TypingTest() {
         return;
       }
 
-      // Quick restart shortcut. tab + enter (or plain tab) restarts the test.
+      // tab restarts the test
       if (e.key === "Tab") {
         e.preventDefault();
         setupNewTest(ref.passage);
@@ -556,15 +535,13 @@ export default function TypingTest() {
       }
 
       if (e.key === "Enter") {
-        // Convenience: pressing enter on a touch device or without modifiers
-        // also restarts. Combined with Tab, this is the documented shortcut.
+        // enter restarts too
         e.preventDefault();
         setupNewTest(ref.passage);
         return;
       }
 
-      // Ignore browser shortcuts that may use the keyboard while the user
-      // isn't actually typing into our hidden field.
+      // let browser shortcuts through
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       if (e.key === "Backspace") {
@@ -594,7 +571,7 @@ export default function TypingTest() {
     previewActiveRef.current = false;
     setPreview(false);
     stateRef.current.isPreview = false;
-    // Replace preview contents with a real test passage.
+    // swap the preview for a real passage
     const freshTokens = tokensFor(targetPassage);
     stateRef.current.passage = targetPassage;
     stateRef.current.tokens = freshTokens;
@@ -646,7 +623,7 @@ export default function TypingTest() {
     token.status = "untyped";
     stateRef.current.currentIndex = idxPrev;
     setCurrentIndex(idxPrev);
-    // Update the DOM node in place — no full re-render — to keep typing fast.
+    // update the span directly instead of re-rendering
     const span = wordsFlowRef.current?.querySelector<HTMLElement>(
       `[data-token-index="${idxPrev}"]`,
     );
@@ -708,14 +685,12 @@ export default function TypingTest() {
       errorCount: nextError,
     });
 
-    // Word-target completion check for words mode.
+    // words mode: finish when the last character is typed
     if (stateRef.current.mode === "words") {
       const typed = stateRef.current.passage.slice(0, nextIndex);
       const lastSpace = typed.lastIndexOf(" ");
       const lastTypedWord = lastSpace === -1 ? typed : typed.slice(lastSpace + 1);
-      // The user has finished the target when the most recent word boundary
-      // happens to be the final character index of the passage (and the user
-      // just typed a space).
+      // last character reached, target complete
       if (char === " " && nextIndex >= stateRef.current.tokens.length) {
         finishTest();
         return;
@@ -729,14 +704,12 @@ export default function TypingTest() {
     }
   }
 
-  // Derived display values used by both the caret layout effect and the JSX
-  // below. Declared up front so the layout effect can reference them safely.
+  // sizes used by the caret effect and the JSX below
   const textSizePx = TEXT_SIZE_TO_PX[prefs.textSize];
   const lineHeightPx = TEXT_SIZE_LINE_HEIGHT[prefs.textSize];
 
-  // Position the caret before paint whenever anything that moves the active
-  // character changes. The preview caret sits on the first character, so it
-  // does not need to follow previewCharIndex.
+  // place the caret before paint when the active character changes
+  // (the preview caret stays on the first character)
   useLayoutEffect(() => {
     updateCaretPosition(currentIndex);
   }, [
@@ -749,9 +722,7 @@ export default function TypingTest() {
     previewPhraseIndex,
   ]);
 
-  // Re-measure when layout changes without a React state change: viewport
-  // resize / line re-wrap (ResizeObserver) and web fonts finishing their load
-  // (document.fonts), which reflows text after the first measurement.
+  // re-measure on resize / re-wrap and when fonts finish loading
   useEffect(() => {
     const flow = wordsFlowRef.current;
     const onLayoutChange = () => updateCaretPosition();
@@ -782,24 +753,21 @@ export default function TypingTest() {
     return () => clearTimers();
   }, [clearTimers]);
 
-  // Keep input focus on the hidden field for mobile-soft-keyboard reliability.
+  // keep focus on the hidden input for mobile keyboards
   useEffect(() => {
     if (testFinished || isPreview) return;
     hiddenInputRef.current?.focus({ preventScroll: true });
   }, [testFinished, isPreview, mode, timeLimit, wordsLimit]);
 
-  // Build preview render output. We render the typed slice + remaining slice
-  // each tick to avoid re-creating the entire DOM.
+  // preview text split into typed and remaining part
   const previewPhrase = PREVIEW_PHRASES[previewPhraseIndex]!;
   const typedSlice = previewPhrase.slice(0, previewCharIndex);
 
-  // Caret glow / blink modes: blink during preview, steady smooth follow while
-  // typing. Conceal entirely if user disabled caret.
+  // blink in preview, steady while typing, hidden if caret is off
   const caretDisplay = prefs.caret && (isPreview || testStarted) ? "block" : "none";
   const caretBlink = isPreview;
 
-  // Stable class strings per token state and current text size. Strings only
-  // change when the user explicitly resizes, so spamming keys never re-reads.
+  // class strings only change when the text size changes
   const tokenUntypedClass = tokenUntypedClassFactory(prefs.textSize);
   const tokenCorrectClass = tokenCorrectClassFactory(prefs.textSize);
   const tokenErrorClass = tokenErrorClassFactory(prefs.textSize);
@@ -835,8 +803,7 @@ export default function TypingTest() {
       className="relative grid min-h-screen grid-rows-[auto_1fr_auto] pt-2 sm:pt-4"
       aria-label="SnailType minimal typing test"
     >
-      {/* Subtle ambient vignette behind the typing stage so the panel reads
-       * as a soft horizon instead of a flat black card. */}
+      {/* soft glow behind the card */}
       <div
         className="pointer-events-none absolute inset-0 z-0 flex items-start justify-center overflow-hidden"
         aria-hidden="true"
@@ -856,7 +823,7 @@ export default function TypingTest() {
       />
 
       <div className="relative z-10 mt-2 flex w-full max-w-4xl place-self-center self-center flex-col items-center px-2 sm:px-4 sm:my-auto">
-        {/* Top telemetry & mode bar — matches the supplied design layout. */}
+        {/* stats and mode bar */}
         <div className="mb-4 flex w-full items-end justify-between px-2">
           <div
             className={`flex items-center gap-[18px] font-mono text-[13px] tracking-[0.02em] text-[#a58a90] transition-opacity duration-300 ${
@@ -921,12 +888,12 @@ export default function TypingTest() {
           </div>
         </div>
 
-        {/* Stage card with ambient top highlight + bottom horizon glow. */}
+        {/* stage card */}
         <div
           ref={stageCardRef}
           className="relative w-full cursor-text overflow-hidden rounded-[22px] border border-[#30212A] bg-[#090709] px-6 py-8 sm:px-10 sm:py-10 select-none transition-shadow duration-200 min-h-[300px] sm:min-h-[320px]"
           onMouseDown={(e) => {
-            // Don't autofocus if a button / popover is being clicked.
+            // ignore clicks on buttons and inputs
             const tag = (e.target as HTMLElement | null)?.tagName ?? "";
             if (["BUTTON", "A", "INPUT", "SELECT"].includes(tag)) return;
             if (isPreview) {
@@ -946,12 +913,12 @@ export default function TypingTest() {
                 : "Typing test in progress. Focus this area with click or tab."
           }
         >
-          {/* Top hairline highlight — burgundy ambient bleed. */}
+          {/* top highlight line */}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[#6d384f] to-transparent opacity-50" />
-          {/* Bottom horizon glow */}
+          {/* bottom glow */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[rgba(109,56,79,0.18)] to-transparent" />
 
-          {/* Spinner banner — visible only in preview */}
+          {/* preview banner */}
           <div
             className={`flex items-center justify-between font-mono text-[11px] uppercase tracking-[0.06em] text-[#a58a90] transition-opacity duration-300 ${
               isPreview ? "opacity-60" : "opacity-0"
@@ -965,8 +932,7 @@ export default function TypingTest() {
             <span className="text-[#574146]">snail cadence</span>
           </div>
 
-          {/* Typing stream container. Whitespace preserved so the text is
-           * positioned authentically versus the supplied design. */}
+          {/* typing text */}
           <div
             ref={wordsFlowRef}
             className="relative my-auto w-full min-h-[140px] whitespace-pre-wrap break-words py-4 font-sans leading-[1.65] tracking-[0.01em] text-[#5C4E56] transition-opacity duration-200"
@@ -983,7 +949,7 @@ export default function TypingTest() {
             )}
           </div>
 
-          {/* Animated caret pill — flat 2px bar in the accent color. */}
+          {/* caret */}
           <div
             ref={caretRef}
             className={`caret ${caretBlink ? "caret--idle" : ""}`}
@@ -995,7 +961,7 @@ export default function TypingTest() {
             aria-hidden="true"
           />
 
-          {/* Hidden input acts as IME / soft-keyboard composition target. */}
+          {/* hidden input for IME / soft keyboard */}
           <input
             ref={hiddenInputRef}
             type="text"
@@ -1014,7 +980,7 @@ export default function TypingTest() {
             }}
           />
 
-          {/* Results overlay — replaces typing view when test ends. */}
+          {/* results overlay */}
           {testFinished && result && (
             <ResultsCard
               wpm={result.wpm}
@@ -1028,7 +994,7 @@ export default function TypingTest() {
           )}
         </div>
 
-        {/* Sub-canvas zen indicator */}
+        {/* hint line under the card */}
         <div
           className={`mt-4 flex w-full items-center justify-between px-2 font-mono text-[11px] tracking-[0.04em] text-[#574146]`}
         >
@@ -1044,7 +1010,7 @@ export default function TypingTest() {
 
       <Footer />
 
-      {/* Live SR announcement when test ends. */}
+      {/* screen reader announcement */}
       <div className="sr-only" aria-live="polite" role="status">
         {testFinished && result
           ? `Test complete. ${result.wpm} words per minute, ${result.accuracy}% accuracy, ${result.errors} errors.`
@@ -1317,9 +1283,7 @@ function KeyHint({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Token class factories keep the inline editing of spans class-only so React
-// does not re-create the spans during typing. Returning a function is fine
-// because the strings are stable per text-size preference value.
+// class strings per token state, so spans can be edited without re-rendering
 function tokenCorrectClassFactory(size: Preferences["textSize"]) {
   return `${textClassForUntyped(size)} text-[#f0eaed]`;
 }
@@ -1330,8 +1294,7 @@ function tokenUntypedClassFactory(size: Preferences["textSize"]) {
   return `${textClassForUntyped(size)} text-[#5C4E56]`;
 }
 function textClassForUntyped(size: Preferences["textSize"]) {
-  // The outline color is a soft 50% opacity variant in the original; since
-  // we use a similar tone we keep the dim foreground steady across states.
+  // same base class for every state, only the colour changes
   void size;
   return `font-sans whitespace-pre-wrap`;
 }
