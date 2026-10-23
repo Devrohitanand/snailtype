@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@font-face {
+  font-family: "Google Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local("Google Sans"), local("Product Sans"), local("GoogleSans-Regular");
+}
+@font-face {
+  font-family: "Google Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: local("Google Sans Medium"), local("Google Sans"), local("Product Sans Medium"),
+    local("Product Sans"), local("GoogleSans-Medium");
+}
+@font-face {
+  font-family: "Google Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local("Google Sans Bold"), local("Google Sans"), local("Product Sans Bold"),
+    local("Product Sans"), local("GoogleSans-Bold");
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #050405;
+  color: #f0eaed;
+  font-family: "Google Sans", "Product Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    system-ui, sans-serif;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  overscroll-behavior: none;
+}
+
+/* Dotted ambient background — the design calls for an almost-black canvas with
+ * faint pinpoint texture to break up the dark plane without changing its color. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle at center, rgba(255, 235, 240, 0.04) 0.6px, transparent 0.6px);
+  background-size: 22px 22px;
+  background-position: 0 0;
+  opacity: 0.6;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  scrollbar-width: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* Caret vertical bar — flat 2px bar, no anti-aliased soft edges. */
+.caret {
+  width: 2px;
+  height: 34px;
+  background-color: #ff6b9f;
+  border-radius: 9999px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+  will-change: transform;
+  /* Hidden until TypingTest positions it for the first time (data-ready). */
+  visibility: hidden;
+}
+.caret[data-ready="true"] {
+  visibility: visible;
+}
+
+/* Caret blink during idle / preview. Active typing uses the smooth translate
+ * only and disables blinking. */
+.caret--idle {
+  animation: caretBlink 1.06s steps(2, end) infinite;
+}
+@keyframes caretBlink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Typing stream word wrap and line breaks. */
+.words-flow {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret--idle {
+    animation: none;
+    opacity: 1;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
