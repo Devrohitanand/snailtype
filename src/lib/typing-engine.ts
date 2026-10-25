@@ -12,7 +12,7 @@ export interface ResultMetrics {
   errorChars: number;
   durationMs: number;
 }
-
+// Computes the words per minute (WPM) for a given number of correct characters and elapsed time.
 export function computeWpm(correctChars: number, elapsedMs: number): number {
   if (elapsedMs <= 0) return 0;
   const minutes = elapsedMs / 60000;
