@@ -17,16 +17,13 @@ describe("computeWpm", () => {
   });
 
   it("computes standard five-char gross WPM deterministically", () => {
-    // 250 correct chars / 5 chars-per-word / 1 minute = 50 wpm
+    // Five characters count as one word for WPM.
     expect(computeWpm(250, 60_000)).toBe(50);
   });
 
   it("rounds to nearest integer and never goes negative", () => {
-    // 1 char / 12s = 0.2 words / 0.2 minute = 1 wpm
     expect(computeWpm(1, 12_000)).toBe(1);
-    // 50 chars / 30s = 50/5 / 0.5 → 20 wpm
     expect(computeWpm(50, 30_000)).toBe(20);
-    // Negative safety
     expect(computeWpm(100, -1)).toBe(0);
   });
 });
@@ -47,9 +44,9 @@ describe("completedWordCount", () => {
   it("counts typed words up to the caret, ignoring trailing spaces", () => {
     const passage = "the quick brown fox";
     expect(completedWordCount(passage, 3)).toBe(1); // "the"
-    expect(completedWordCount(passage, 4)).toBe(1); // "the " (trailing space)
+    expect(completedWordCount(passage, 4)).toBe(1); // "the "
     expect(completedWordCount(passage, 9)).toBe(2); // "the quick"
-    expect(completedWordCount(passage, 10)).toBe(2); // "the quick " trailing sp
+    expect(completedWordCount(passage, 10)).toBe(2); // "the quick "
   });
 
   it("handles empty input", () => {
