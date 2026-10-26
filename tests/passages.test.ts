@@ -25,3 +25,20 @@ describe("pickPassage", () => {
     expect(typeof pickPassage(null)).toBe("string");
   });
 });
+import { describe, expect, it } from "vitest";
+import { pickPassage, truncateToWords } from "@/lib/passages";
+
+describe("truncateToWords", () => {
+  it("keeps text shorter than target intact", () => {
+    expect(truncateToWords("a b c", 10)).toBe("a b c");
+  });
+
+  it("truncates at word boundaries when exceeding target", () => {
+    const text = "the quick brown fox jumps over";
+    expect(truncateToWords(text, 3)).toBe("the quick brown");
+  });
+
+  it("strips trailing whitespace and never returns a half-trailing-word", () => {
+    expect(truncateToWords("a b c d e", 2)).toBe("a b");
+  });
+});
