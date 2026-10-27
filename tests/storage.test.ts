@@ -77,3 +77,71 @@ describe("storage", () => {
     expect(reloaded.results[1]?.wpm).toBe(80);
   });
 });
+
+  it("caps stored history at 200 records", () => {
+    let stats: StoredStats = { results: [] };
+
+    for (let i = 0; i < 240; i++) {
+      stats = appendResult(stats, {
+        finishedAt: i,
+        wpm: i,
+        accuracy: 90,
+        correct: 200,
+        errors: 5,
+        durationMs: 60_000,
+        mode: "time",
+        target: 30,
+      });
+    }
+
+    expect(stats.results).toHaveLength(200);
+  });
+
+  it("loadStats validates stored records and drops bad ones", () => {
+    (globalThis as any).localStorage.getItem = (key: string) =>
+      key === "snailtype.stats.v1"
+        ? JSON.stringify({
+            results: [
+              {
+                finishedAt: 1,
+                wpm: 50,
+                accuracy: 96,
+                correct: 200,
+                errors: 0,
+                durationMs: 60000,
+                mode: "time",
+                target: 30,
+              },
+              // Missing required fields.
+              { wpm: "fast" },
+              // This mode isn't supported.
+              {
+                finishedAt: 2,
+                wpm: 30,
+                accuracy: 90,
+                correct: 100,
+                errors: 1,
+                durationMs: 60000,
+                mode: "lightning",
+                target: 30,
+              },
+              // WPM must be a valid number.
+              {
+                finishedAt: 3,
+                wpm: NaN,
+                accuracy: 90,
+                correct: 100,
+                errors: 1,
+                durationMs: 60000,
+                mode: "time",
+                target: 30,
+              },
+              null,
+              "string",
+            ],
+          })
+        : null;
+
+    expect(loadStats().results).toHaveLength(1);
+    expect(loadStats().results[0]?.wpm).toBe(50);
+  });
